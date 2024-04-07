@@ -3,12 +3,10 @@
 use core::iter;
 
 use embedded_graphics::{
-    pixelcolor::{raw::ToBytes, Rgb565},
-    prelude::{DrawTarget, OriginDimensions, Size},
-    primitives::Rectangle,
-    Pixel,
+    geometry::Point, pixelcolor::{raw::ToBytes, Rgb565}, prelude::{DrawTarget, OriginDimensions, Size}, primitives::Rectangle, Pixel
 };
 use embedded_hal_1::{delay::DelayNs, digital::OutputPin};
+
 
 use hal::{
     prelude::_esp_hal_dma_DmaTransfer,
@@ -191,21 +189,12 @@ where
         Ok(())
     }
 
-    /// Use a framebuffer to fill the screen.
-    /* Framebuffer::<
-        Rgb565,
-        _,
-        BigEndian,
-        536,
-        240,
-        { embedded_graphics::framebuffer::buffer_size::<Rgb565>(536, 240) },
-    > */
-    pub unsafe fn fill_with_framebuffer(&mut self, raw_framebuffer: &[u8]) -> Result<(), ()> {
+    pub unsafe fn framebuffer_for_viewport(&mut self, raw_framebuffer: &[u8],view_port: Rectangle) -> Result<(), ()> {
         self.set_address(
-            0,
-            0,
-            self.size().width as u16 - 1,
-            self.size().height as u16 - 1,
+            view_port.top_left.x as u16,
+            view_port.top_left.y as u16,
+            view_port.size.width as u16 + view_port.top_left.x as u16 - 1,
+            view_port.size.height as u16 + view_port.top_left.y as u16 - 1,
         )?;
 
         let mut first_send = true;
@@ -218,7 +207,21 @@ where
         }
 
         self.cs.set_high().unwrap();
+
         Ok(())
+    }
+    /// Use a framebuffer to fill the screen.
+    /* Framebuffer::<
+        Rgb565,
+        _,
+        BigEndian,
+        536,
+        240,
+        { embedded_graphics::framebuffer::buffer_size::<Rgb565>(536, 240) },
+    > */
+    pub unsafe fn fill_with_framebuffer(&mut self, raw_framebuffer: &[u8]) -> Result<(), ()> {
+        let view_port = Rectangle::new(Point::new(0, 0), Size { width: self.size().width - 1, height: self.size().height - 1 });
+        self.framebuffer_for_viewport(raw_framebuffer, view_port)
     }
 
     pub fn fill_colors(
